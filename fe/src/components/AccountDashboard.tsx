@@ -22,6 +22,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
+  Legend,
 } from "recharts"
 
 interface AccountOverview {
@@ -35,6 +36,15 @@ interface AccountOverview {
 interface BalanceHistoryPoint {
   timestamp: number
   balance_sol: number
+}
+
+interface FeesHistoryPoint {
+  timestamp: number
+  total_fees_sol: number
+  success_fees_sol: number
+  failed_fees_sol: number
+  success_count: number
+  failed_count: number
 }
 
 interface SolChange {
@@ -72,11 +82,13 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
 }) => {
   const [overview, setOverview] = useState<AccountOverview | null>(null)
   const [balanceHistory, setBalanceHistory] = useState<BalanceHistoryPoint[]>([])
+  const [feesHistory, setFeesHistory] = useState<FeesHistoryPoint[]>([])
   const [transactions, setTransactions] = useState<TransactionItem[]>([])
   const [source, setSource] = useState<"db" | "rpc" | "">("")
   const [loadingOverview, setLoadingOverview] = useState(false)
   const [loadingTransactions, setLoadingTransactions] = useState(false)
   const [loadingChart, setLoadingChart] = useState(false)
+  const [loadingFeesChart, setLoadingFeesChart] = useState(false)
 
   // Indexing State
   const [startDate, setStartDate] = useState("2026-06-01")
@@ -94,6 +106,7 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
       fetchOverview()
       fetchTransactions()
       fetchBalanceHistory()
+      fetchFeesHistory()
       checkActiveIndexJob()
     }
   }, [address, rpcUrl])
@@ -175,6 +188,30 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
     }
   }
 
+  const fetchFeesHistory = async () => {
+    setLoadingFeesChart(true)
+    try {
+      const startSec = startDate ? new Date(startDate).getTime() / 1000 : undefined
+      const endSec = endDate ? new Date(endDate).getTime() / 1000 + 86399 : undefined
+      
+      let url = `${backendUrl}/api/account/${address}/fees-history?`
+      if (startSec) url += `&start_date=${startSec}`
+      if (endSec) url += `&end_date=${endSec}`
+
+      const res = await fetch(url, {
+        headers: { "x-solana-rpc-url": rpcUrl },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setFeesHistory(data)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoadingFeesChart(false)
+    }
+  }
+
   const checkActiveIndexJob = async () => {
     try {
       const res = await fetch(`${backendUrl}/api/account/${address}/index`)
@@ -246,6 +283,7 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
             // Reload all lists after indexing
             fetchTransactions()
             fetchBalanceHistory()
+            fetchFeesHistory()
           }
         } else {
           clearInterval(interval)
@@ -331,7 +369,7 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
               {source || "fetching..."}
             </span>
           </div>
-          <Button variant="outline" size="sm" onClick={() => { fetchOverview(); fetchTransactions(); fetchBalanceHistory(); }}>
+          <Button variant="outline" size="sm" onClick={() => { fetchOverview(); fetchTransactions(); fetchBalanceHistory(); fetchFeesHistory(); }}>
             Refresh Dashboard
           </Button>
         </div>
@@ -439,7 +477,7 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
                 />
               </div>
               <div className="flex items-center gap-3">
-                <Button variant="secondary" onClick={() => { fetchTransactions(); fetchBalanceHistory(); }}>
+                <Button variant="secondary" onClick={() => { fetchTransactions(); fetchBalanceHistory(); fetchFeesHistory(); }}>
                   Apply Filter
                 </Button>
                 <Button
@@ -524,72 +562,166 @@ export const AccountDashboard: React.FC<AccountDashboardProps> = ({
         </Card>
       </div>
 
-      {/* SOL Balance over time chart */}
-      <Card className="glow-primary">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle className="text-lg font-bold">SOL Balance Over Time</CardTitle>
-            <CardDescription>Reconstructed from indexed balance change events</CardDescription>
-          </div>
-          <TrendingUp className="h-5 w-5 text-indigo-500" />
-        </CardHeader>
-        <CardContent>
-          <div className="h-64 w-full">
-            {loadingChart ? (
-              <div className="flex h-full w-full items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
-              </div>
-            ) : balanceHistory.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={balanceHistory} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="balanceGlow" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.15)" />
-                  <XAxis
-                    dataKey="timestamp"
-                    tickFormatter={(tick) => new Date(tick * 1000).toLocaleDateString()}
-                    stroke="currentColor"
-                    className="text-[10px] text-muted-foreground"
-                  />
-                  <YAxis
-                    stroke="currentColor"
-                    className="text-[10px] text-muted-foreground"
-                    domain={["auto", "auto"]}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: "hsl(var(--card))",
-                      border: "1px solid hsl(var(--border))",
-                      borderRadius: "6px",
-                      color: "hsl(var(--card-foreground))",
-                    }}
-                    labelFormatter={(label) => formatTimestamp(label)}
-                    formatter={(value: any) => [`${parseFloat(value).toFixed(6)} SOL`, "Balance"]}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="balance_sol"
-                    stroke="#6366f1"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#balanceGlow)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex h-full w-full flex-col items-center justify-center text-muted-foreground border border-dashed rounded-lg bg-muted/10 p-6">
-                <Info className="h-8 w-8 mb-2" />
-                <span className="text-sm font-semibold">No balance history data available</span>
-                <span className="text-xs text-center mt-1">Index this account above to rebuild its history from transactions.</span>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Grid for Charts */}
+      <div className="grid grid-cols-1 gap-6">
+        {/* SOL Balance over time chart */}
+        <Card className="glow-primary flex flex-col justify-between">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle className="text-lg font-bold">SOL Balance Over Time</CardTitle>
+              <CardDescription>Absolute balance timeline from indexed blocks</CardDescription>
+            </div>
+            <TrendingUp className="h-5 w-5 text-indigo-500" />
+          </CardHeader>
+          <CardContent className="pt-4 flex-1 flex flex-col justify-end">
+            <div className="h-64 w-full">
+              {loadingChart ? (
+                <div className="flex h-full w-full items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+                </div>
+              ) : balanceHistory.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart syncId="accountAnalytics" data={balanceHistory} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="balanceGlow" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#6366f1" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.15)" />
+                    <XAxis
+                      dataKey="timestamp"
+                      tickFormatter={(tick) => new Date(tick * 1000).toLocaleDateString()}
+                      stroke="currentColor"
+                      className="text-[10px] text-muted-foreground"
+                    />
+                    <YAxis
+                      stroke="currentColor"
+                      className="text-[10px] text-muted-foreground"
+                      domain={["auto", "auto"]}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "6px",
+                        color: "hsl(var(--card-foreground))",
+                      }}
+                      labelFormatter={(label) => formatTimestamp(label)}
+                      formatter={(value: any) => [`${parseFloat(value).toFixed(6)} SOL`, "Balance"]}
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="balance_sol"
+                      stroke="#6366f1"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#balanceGlow)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full w-full flex-col items-center justify-center text-muted-foreground border border-dashed rounded-lg bg-muted/10 p-6">
+                  <Info className="h-8 w-8 mb-2" />
+                  <span className="text-sm font-semibold">No balance history data available</span>
+                  <span className="text-xs text-center mt-1">Index this account above to rebuild its history from transactions.</span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Transaction Fees & Priority Fees chart */}
+        <Card className="glow-primary flex flex-col justify-between">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div>
+              <CardTitle className="text-lg font-bold">Transaction Fees Over Time</CardTitle>
+              <CardDescription>Reconciliation of standard fees, priority fees, and counts</CardDescription>
+            </div>
+            <TrendingUp className="h-5 w-5 text-indigo-500" />
+          </CardHeader>
+          <CardContent className="pt-4 flex-1 flex flex-col justify-end">
+            <div className="h-64 w-full">
+              {loadingFeesChart ? (
+                <div className="flex h-full w-full items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-indigo-500" />
+                </div>
+              ) : feesHistory.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart syncId="accountAnalytics" data={feesHistory} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="successFeeGlow" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.0} />
+                      </linearGradient>
+                      <linearGradient id="failedFeeGlow" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.4} />
+                        <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(128,128,128,0.15)" />
+                    <XAxis
+                      dataKey="timestamp"
+                      tickFormatter={(tick) => new Date(tick * 1000).toLocaleDateString()}
+                      stroke="currentColor"
+                      className="text-[10px] text-muted-foreground"
+                    />
+                    <YAxis
+                      stroke="currentColor"
+                      className="text-[10px] text-muted-foreground"
+                      domain={[0, "auto"]}
+                    />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "hsl(var(--card))",
+                        border: "1px solid hsl(var(--border))",
+                        borderRadius: "6px",
+                        color: "hsl(var(--card-foreground))",
+                      }}
+                      labelFormatter={(label) => formatTimestamp(label)}
+                      formatter={(value: any, name: any) => {
+                        const nameMap: Record<string, string> = {
+                          success_fees_sol: "Success Fees",
+                          failed_fees_sol: "Failed Fees",
+                          total_fees_sol: "Total Fees"
+                        };
+                        return [`${parseFloat(value).toFixed(6)} SOL`, nameMap[name] || name];
+                      }}
+                    />
+                    <Legend verticalAlign="top" height={36} iconType="circle" className="text-xs" />
+                    <Area
+                      type="monotone"
+                      dataKey="success_fees_sol"
+                      stackId="1"
+                      stroke="#10b981"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#successFeeGlow)"
+                      name="success_fees_sol"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="failed_fees_sol"
+                      stackId="1"
+                      stroke="#f43f5e"
+                      strokeWidth={2}
+                      fillOpacity={1}
+                      fill="url(#failedFeeGlow)"
+                      name="failed_fees_sol"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex h-full w-full flex-col items-center justify-center text-muted-foreground border border-dashed rounded-lg bg-muted/10 p-6">
+                  <Info className="h-8 w-8 mb-2" />
+                  <span className="text-sm font-semibold">No fee history data available</span>
+                  <span className="text-xs text-center mt-1">Index this account above as a fee payer to analyze transaction fees.</span>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Transactions Table */}
       <Card>

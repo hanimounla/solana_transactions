@@ -358,11 +358,13 @@ impl Db {
 
     pub async fn get_sol_balance_changes_for_address(&self, address: &str) -> Result<Vec<(i64, i64)>, String> {
         let rows = sqlx::query(
-            "SELECT t.block_time, s.change_amount
+            "SELECT DISTINCT ON ((t.block_time / 300) * 300)
+                    (t.block_time / 300) * 300 AS bucket_time,
+                    s.post_balance
              FROM sol_balance_changes s
              JOIN transactions t ON s.signature = t.signature
              WHERE s.address = $1
-             ORDER BY t.block_time DESC"
+             ORDER BY bucket_time DESC, t.block_time DESC, s.id DESC"
         )
         .bind(address)
         .fetch_all(&self.pool)
@@ -370,9 +372,51 @@ impl Db {
         .map_err(|e| format!("Failed to fetch SOL balance changes: {}", e))?;
 
         let changes = rows.iter().map(|r| {
-            (r.get::<i64, _>("block_time"), r.get::<i64, _>("change_amount"))
+            (r.get::<i64, _>("bucket_time"), r.get::<i64, _>("post_balance"))
         }).collect();
 
         Ok(changes)
     }
+
+    pub async fn get_fees_history_for_address(&self, address: &str) -> Result<Vec<DbFeesBucket>, String> {
+        let rows = sqlx::query(
+            "SELECT (block_time / 300) * 300 AS bucket_time,
+                    SUM(fee)::BIGINT AS total_fees,
+                    SUM(CASE WHEN err = FALSE THEN fee ELSE 0 END)::BIGINT AS success_fees,
+                    SUM(CASE WHEN err = TRUE THEN fee ELSE 0 END)::BIGINT AS failed_fees,
+                    COUNT(CASE WHEN err = FALSE THEN 1 END)::BIGINT AS success_count,
+                    COUNT(CASE WHEN err = TRUE THEN 1 END)::BIGINT AS failed_count
+             FROM transactions
+             WHERE fee_payer = $1
+             GROUP BY bucket_time
+             ORDER BY bucket_time DESC"
+        )
+        .bind(address)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| format!("Failed to fetch fees history: {}", e))?;
+
+        let buckets = rows.iter().map(|r| {
+            DbFeesBucket {
+                bucket_time: r.get::<i64, _>("bucket_time"),
+                total_fees: r.get::<i64, _>("total_fees"),
+                success_fees: r.get::<i64, _>("success_fees"),
+                failed_fees: r.get::<i64, _>("failed_fees"),
+                success_count: r.get::<i64, _>("success_count"),
+                failed_count: r.get::<i64, _>("failed_count"),
+            }
+        }).collect();
+
+        Ok(buckets)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct DbFeesBucket {
+    pub bucket_time: i64,
+    pub total_fees: i64,
+    pub success_fees: i64,
+    pub failed_fees: i64,
+    pub success_count: i64,
+    pub failed_count: i64,
 }

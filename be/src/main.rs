@@ -64,6 +64,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             post(routes::start_indexing).get(routes::get_indexing_progress),
         )
         .route("/api/account/:address/balance-history", get(routes::get_balance_history))
+        .route("/api/account/:address/fees-history", get(routes::get_fees_history))
         .route("/api/transaction/:signature", get(routes::get_transaction_detail))
         .layer(cors)
         .with_state(state);

@@ -210,7 +210,8 @@ pub async fn get_transactions(
     let start = params.start_date.unwrap_or(0);
     let end = params.end_date.unwrap_or(chrono::Utc::now().timestamp());
 
-    match rpc.get_signatures_for_address(&address, None, None, Some(limit as usize + offset as usize)).await {
+    let rpc_limit = std::cmp::min(1000, limit + offset) as usize;
+    match rpc.get_signatures_for_address(&address, None, None, Some(rpc_limit)).await {
         Ok(signatures) => {
             let mut filtered_txs = Vec::new();
             
@@ -436,23 +437,20 @@ pub async fn get_balance_history(
         .into_response();
     }
 
-    // 3. Reconstruct history backwards
+    // 3. Map database post_balance history directly (source of truth)
     let mut history = Vec::new();
-    let mut current = current_balance_lamports;
 
     // Add current balance as the first (newest) point
     let now_sec = chrono::Utc::now().timestamp();
     history.push(BalancePoint {
         timestamp: now_sec,
-        balance_sol: current as f64 / 1_000_000_000.0,
+        balance_sol: current_balance_lamports as f64 / 1_000_000_000.0,
     });
 
-    for (block_time, change) in changes {
-        // Balance before transaction = current_balance - change
-        current = current - change;
+    for (bucket_time, post_balance) in changes {
         history.push(BalancePoint {
-            timestamp: block_time,
-            balance_sol: current as f64 / 1_000_000_000.0,
+            timestamp: bucket_time,
+            balance_sol: post_balance as f64 / 1_000_000_000.0,
         });
     }
 
@@ -468,6 +466,55 @@ pub async fn get_balance_history(
     }
 
     Json(history).into_response()
+}
+
+#[derive(Serialize)]
+pub struct FeesPoint {
+    pub timestamp: i64,
+    pub total_fees_sol: f64,
+    pub success_fees_sol: f64,
+    pub failed_fees_sol: f64,
+    pub success_count: i64,
+    pub failed_count: i64,
+}
+
+// Handler for fees history over time
+pub async fn get_fees_history(
+    State(state): State<Arc<AppState>>,
+    Path(address): Path<String>,
+    Query(params): Query<TransactionsQuery>,
+) -> impl IntoResponse {
+    let buckets = match state.db.get_fees_history_for_address(&address).await {
+        Ok(b) => b,
+        Err(e) => {
+            error!("Failed to fetch fees history from database: {}", e);
+            return (StatusCode::INTERNAL_SERVER_ERROR, "Database query error").into_response();
+        }
+    };
+
+    let mut points: Vec<FeesPoint> = buckets.into_iter().map(|b| {
+        FeesPoint {
+            timestamp: b.bucket_time,
+            total_fees_sol: b.total_fees as f64 / 1_000_000_000.0,
+            success_fees_sol: b.success_fees as f64 / 1_000_000_000.0,
+            failed_fees_sol: b.failed_fees as f64 / 1_000_000_000.0,
+            success_count: b.success_count,
+            failed_count: b.failed_count,
+        }
+    }).collect();
+
+    // Reverse to go chronologically
+    points.reverse();
+
+    // Apply date range filters if requested
+    if let Some(start) = params.start_date {
+        points.retain(|pt| pt.timestamp >= start);
+    }
+    if let Some(end) = params.end_date {
+        points.retain(|pt| pt.timestamp <= end);
+    }
+
+    Json(points).into_response()
 }
 
 // Handler for detailed single Transaction view

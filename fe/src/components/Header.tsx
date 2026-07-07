@@ -156,8 +156,8 @@ export const Header: React.FC<HeaderProps> = ({
               value={network}
               onChange={handleNetworkChange}
             >
-              <option value="devnet" className="bg-background">Devnet</option>
               <option value="mainnet" className="bg-background">Mainnet</option>
+              <option value="devnet" className="bg-background">Devnet</option>
               <option value="testnet" className="bg-background">Testnet</option>
               <option value="custom" className="bg-background">Custom RPC</option>
             </Select>
@@ -205,11 +205,10 @@ export const Header: React.FC<HeaderProps> = ({
 
               {rpcStatus.type && (
                 <div
-                  className={`flex items-start gap-2 rounded-md p-3 text-xs ${
-                    rpcStatus.type === "success"
+                  className={`flex items-start gap-2 rounded-md p-3 text-xs ${rpcStatus.type === "success"
                       ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                       : "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
-                  }`}
+                    }`}
                 >
                   {rpcStatus.type === "success" ? (
                     <CheckCircle className="h-4 w-4 shrink-0" />

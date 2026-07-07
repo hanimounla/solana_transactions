@@ -34,7 +34,7 @@ impl Indexer {
         let mut signatures_to_fetch = Vec::new();
         let mut before_signature: Option<String> = None;
         let mut stop_crawling = false;
-        let limit = 500;
+        let limit = 1000;
 
         let mut min_block_time_seen: Option<i64> = None;
         let mut max_block_time_seen: Option<i64> = None;
@@ -87,9 +87,9 @@ impl Indexer {
             }
 
             // If we received less than the limit, we hit the end of history
-            if signatures_to_fetch.len() > 5000 {
-                // Safety guard: don't index more than 5000 transactions at once to avoid RPC overload
-                info!("Safely capping indexing batch to 5000 signatures");
+            if signatures_to_fetch.len() > 500000 {
+                // Safety guard: don't index more than 500,000 transactions at once to avoid RPC overload
+                info!("Safely capping indexing batch to 500000 signatures");
                 break;
             }
         }
