@@ -1,0 +1,19 @@
+{
+    "configurations": [
+        {
+            "name": "Debug solana_transactions",
+            "type": "lldb",
+            "request": "launch",
+            "args": [],
+            "cwd": "${workspaceFolder}/be",
+            "envFile": "${workspaceFolder}/be/.env",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=solana_transactions",
+                    "--package=solana_transactions"
+                ]
+            }
+        }
+    ]
+}
