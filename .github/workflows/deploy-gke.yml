@@ -16,7 +16,7 @@ on:
       gke_cluster:
         description: 'GKE Cluster Name'
         required: false
-        default: 'aiservice-solana-transactions-autopilot-cluster'
+        default: 'autopilot-cluster'
 
 permissions:
   contents: read
@@ -32,6 +32,12 @@ jobs:
   deploy:
     name: Build, Push & Deploy to GKE Autopilot
     runs-on: ubuntu-latest
+    env:
+      WIF_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+      WIF_SA: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      SA_KEY: ${{ secrets.GCP_SA_KEY }}
+      DB_URL_SECRET: ${{ secrets.DATABASE_URL }}
+      RPC_URL_SECRET: ${{ secrets.SOLANA_RPC_URL }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -41,7 +47,7 @@ jobs:
       # Supports either Workload Identity Federation (recommended) or SA Key JSON
       # ===================================================================
       - name: Authenticate to Google Cloud (Workload Identity)
-        if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER != '' }}
+        if: ${{ env.WIF_PROVIDER != '' }}
         uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -49,7 +55,7 @@ jobs:
           token_format: 'access_token'
 
       - name: Authenticate to Google Cloud (Service Account Key Fallback)
-        if: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER == '' && secrets.GCP_SA_KEY != '' }}
+        if: ${{ env.WIF_PROVIDER == '' && env.SA_KEY != '' }}
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
@@ -117,10 +123,10 @@ jobs:
           kubectl create namespace solana-transactions --dry-run=client -o yaml | kubectl apply -f -
 
           # Create or update application secrets if provided in GitHub Secrets
-          if [ -n "${{ secrets.DATABASE_URL }}" ]; then
+          if [ -n "$DB_URL_SECRET" ]; then
             kubectl create secret generic solana-transactions-secrets \
               --namespace=solana-transactions \
-              --from-literal=DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+              --from-literal=DATABASE_URL="$DB_URL_SECRET" \
               --dry-run=client -o yaml | kubectl apply -f -
           else
             echo "DATABASE_URL secret not provided in GitHub Secrets, checking if secret exists in cluster..."
@@ -134,10 +140,10 @@ jobs:
           fi
 
           # Optional custom RPC endpoint secret
-          if [ -n "${{ secrets.SOLANA_RPC_URL }}" ]; then
+          if [ -n "$RPC_URL_SECRET" ]; then
             kubectl create secret generic solana-transactions-secrets \
               --namespace=solana-transactions \
-              --from-literal=SOLANA_RPC_URL="${{ secrets.SOLANA_RPC_URL }}" \
+              --from-literal=SOLANA_RPC_URL="$RPC_URL_SECRET" \
               --dry-run=client -o yaml | kubectl apply -f -
           fi
 
