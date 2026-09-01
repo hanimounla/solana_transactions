@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: solana-transactions-fe
+  namespace: solana-transactions
+  labels:
+    app.kubernetes.io/name: solana-transactions-fe
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: aiservice-solana-transactions
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: solana-transactions-fe
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: solana-transactions-fe
+        app.kubernetes.io/component: frontend
+        app.kubernetes.io/part-of: aiservice-solana-transactions
+    spec:
+      containers:
+        - name: frontend
+          image: us-central1-docker.pkg.dev/aiservice-solana-transactions/solana-transactions/fe:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 80
+              name: http
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+              ephemeral-storage: "500Mi"
+            limits:
+              cpu: "250m"
+              memory: "512Mi"
+              ephemeral-storage: "500Mi"
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: solana-transactions-fe
+  namespace: solana-transactions
+  labels:
+    app.kubernetes.io/name: solana-transactions-fe
+    app.kubernetes.io/component: frontend
+    app.kubernetes.io/part-of: aiservice-solana-transactions
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+      name: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: solana-transactions-fe

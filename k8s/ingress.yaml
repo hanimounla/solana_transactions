@@ -1,0 +1,34 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: solana-transactions-ingress
+  namespace: solana-transactions
+  labels:
+    app.kubernetes.io/name: solana-transactions-ingress
+    app.kubernetes.io/part-of: aiservice-solana-transactions
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    # To attach a Google-managed SSL certificate, uncomment the following line:
+    # networking.gke.io/managed-certificates: "solana-transactions-cert"
+    # To enforce HTTPS redirection:
+    # kubernetes.io/ingress.allow-http: "false"
+spec:
+  rules:
+    - http:
+        paths:
+          # Route API endpoints directly to backend service
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: solana-transactions-be
+                port:
+                  number: 8080
+          # Route all other web traffic to frontend SPA
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: solana-transactions-fe
+                port:
+                  number: 80

@@ -1,0 +1,9 @@
+.git
+.gitignore
+.vscode
+target/
+node_modules/
+dist/
+*.log
+.env
+.env.*

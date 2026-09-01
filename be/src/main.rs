@@ -56,6 +56,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 6. Setup routing
     let app = Router::new()
+        .route("/health", get(routes::health_check))
+        .route("/api/health", get(routes::health_check))
         .route("/api/rpc/test", post(routes::test_rpc))
         .route("/api/account/:address", get(routes::get_account_overview))
         .route("/api/account/:address/transactions", get(routes::get_transactions))

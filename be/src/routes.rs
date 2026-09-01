@@ -20,6 +20,26 @@ pub struct AppState {
     pub index_jobs: Mutex<HashMap<String, Arc<Mutex<IndexJobProgress>>>>,
 }
 
+#[derive(Serialize)]
+pub struct HealthResponse {
+    pub status: &'static str,
+    pub db: &'static str,
+}
+
+pub async fn health_check(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    match sqlx::query("SELECT 1").execute(&state.db.pool).await {
+        Ok(_) => (StatusCode::OK, Json(HealthResponse { status: "ok", db: "connected" })).into_response(),
+        Err(e) => {
+            error!("Health check database ping failed: {}", e);
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(HealthResponse { status: "unhealthy", db: "disconnected" }),
+            )
+                .into_response()
+        }
+    }
+}
+
 #[derive(Deserialize)]
 pub struct RpcTestRequest {
     pub rpc_url: String,

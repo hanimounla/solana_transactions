@@ -5,7 +5,7 @@ import { AccountDashboard } from "./components/AccountDashboard"
 import { TransactionView } from "./components/TransactionView"
 import { Card, CardContent } from "./components/ui/card"
 
-const BACKEND_URL = "http://localhost:8080"
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || ""
 
 function App() {
   const [network, setNetwork] = useState("devnet")
@@ -120,7 +120,7 @@ function App() {
                   <CardContent className="p-4 space-y-2">
                     <div className="text-xs font-bold text-indigo-500">Program / Smart Contract Account</div>
                     <div className="font-mono text-sm truncate">Gmso1uvJnLbawvw7yezdfCDcPydwW2s2iqG3w6MDucLo</div>
-                    <div className="text-xs text-muted-foreground">GMTrade smart contract program</div>
+                    <div className="text-xs text-muted-foreground">Solana Transactions smart contract program</div>
                   </CardContent>
                 </Card>
               </div>

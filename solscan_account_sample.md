@@ -1,4 +1,4 @@
-# GMTrade | Account Gmso1uvJnLbawvw7yezdfCDcPydwW2s2iqG3w6MDucLo | Solscan
+# Solana Transactions | Account Gmso1uvJnLbawvw7yezdfCDcPydwW2s2iqG3w6MDucLo | Solscan
 
 [](/)
 
@@ -94,7 +94,7 @@ More info
 
 Public name
 
-GMTrade
+Solana Transactions
 
 Owner
 
