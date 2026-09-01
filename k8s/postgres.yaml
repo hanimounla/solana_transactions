@@ -35,9 +35,11 @@ spec:
         app.kubernetes.io/name: solana-transactions-db
         app.kubernetes.io/part-of: aiservice-solana-transactions
     spec:
+      securityContext:
+        fsGroup: 999
       containers:
         - name: postgres
-          image: postgres:16-alpine
+          image: postgres:16
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 5432
@@ -52,7 +54,6 @@ spec:
                 secretKeyRef:
                   name: solana-transactions-secrets
                   key: POSTGRES_PASSWORD
-                  optional: true
             - name: PGDATA
               value: "/var/lib/postgresql/data/pgdata"
           resources:
@@ -67,21 +68,23 @@ spec:
           livenessProbe:
             exec:
               command:
-                - /bin/sh
-                - -c
-                - exec pg_isready -U postgres -d solana_transactions_db
-            initialDelaySeconds: 15
+                - pg_isready
+                - -U
+                - postgres
+            initialDelaySeconds: 30
             timeoutSeconds: 5
             periodSeconds: 10
+            failureThreshold: 6
           readinessProbe:
             exec:
               command:
-                - /bin/sh
-                - -c
-                - exec pg_isready -U postgres -d solana_transactions_db
-            initialDelaySeconds: 5
+                - pg_isready
+                - -U
+                - postgres
+            initialDelaySeconds: 10
             timeoutSeconds: 5
             periodSeconds: 10
+            failureThreshold: 6
           volumeMounts:
             - name: data
               mountPath: /var/lib/postgresql/data

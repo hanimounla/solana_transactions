@@ -185,3 +185,27 @@ jobs:
           echo "Deployment successful to GKE Autopilot!"
           echo "=========================================="
           kubectl get all,ingress -n solana-transactions
+
+      - name: Debug Diagnostics on Failure
+        if: failure()
+        run: |
+          echo "=========================================="
+          echo "🔍 Pod Status & Events in solana-transactions:"
+          echo "=========================================="
+          kubectl get pods,pvc,pv,svc,ingress -n solana-transactions -o wide || true
+          echo "=========================================="
+          echo "🔍 Recent Kubernetes Events:"
+          echo "=========================================="
+          kubectl get events -n solana-transactions --sort-by='.metadata.creationTimestamp' || true
+          echo "=========================================="
+          echo "🔍 PostgreSQL Pod Description:"
+          echo "=========================================="
+          kubectl describe pod -l app.kubernetes.io/name=solana-transactions-db -n solana-transactions || true
+          echo "=========================================="
+          echo "🔍 PostgreSQL Pod Logs:"
+          echo "=========================================="
+          kubectl logs -n solana-transactions -l app.kubernetes.io/name=solana-transactions-db --tail=100 || true
+          echo "=========================================="
+          echo "🔍 Backend Deployment Logs:"
+          echo "=========================================="
+          kubectl logs -n solana-transactions -l app.kubernetes.io/name=solana-transactions-be --tail=100 || true
