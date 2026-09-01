@@ -50,10 +50,7 @@ spec:
             - name: POSTGRES_USER
               value: "postgres"
             - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: solana-transactions-secrets
-                  key: POSTGRES_PASSWORD
+              value: "postgres_secure_pass"
             - name: PGDATA
               value: "/var/lib/postgresql/data/pgdata"
           resources:

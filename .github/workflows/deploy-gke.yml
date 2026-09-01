@@ -122,7 +122,7 @@ jobs:
           # Create namespace if it does not already exist
           kubectl create namespace solana-transactions --dry-run=client -o yaml | kubectl apply -f -
 
-          # Create or update application secrets if provided in GitHub Secrets
+          # Create or update application secrets
           if [ -n "$DB_URL_SECRET" ]; then
             kubectl create secret generic solana-transactions-secrets \
               --namespace=solana-transactions \
@@ -130,15 +130,11 @@ jobs:
               --from-literal=POSTGRES_PASSWORD="postgres_secure_pass" \
               --dry-run=client -o yaml | kubectl apply -f -
           else
-            echo "DATABASE_URL secret not provided in GitHub Secrets, checking if secret exists in cluster..."
-            if ! kubectl get secret solana-transactions-secrets -n solana-transactions > /dev/null 2>&1; then
-              echo "Creating default in-cluster DB secret..."
-              kubectl create secret generic solana-transactions-secrets \
-                --namespace=solana-transactions \
-                --from-literal=DATABASE_URL="postgres://postgres:postgres_secure_pass@solana-transactions-db:5432/solana_transactions_db" \
-                --from-literal=POSTGRES_PASSWORD="postgres_secure_pass" \
-                --dry-run=client -o yaml | kubectl apply -f -
-            fi
+            kubectl create secret generic solana-transactions-secrets \
+              --namespace=solana-transactions \
+              --from-literal=DATABASE_URL="postgres://postgres:postgres_secure_pass@solana-transactions-db:5432/solana_transactions_db" \
+              --from-literal=POSTGRES_PASSWORD="postgres_secure_pass" \
+              --dry-run=client -o yaml | kubectl apply -f -
           fi
 
           # Optional custom RPC endpoint secret
