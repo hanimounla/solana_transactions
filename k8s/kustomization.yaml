@@ -6,6 +6,7 @@ namespace: solana-transactions
 resources:
   - namespace.yaml
   - configmap.yaml
+  - secret.yaml
   - postgres.yaml
   - backend-deployment.yaml
   - frontend-deployment.yaml

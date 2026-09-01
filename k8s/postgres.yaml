@@ -83,11 +83,11 @@ spec:
             periodSeconds: 10
             failureThreshold: 6
           volumeMounts:
-            - name: data
+            - name: postgres-storage
               mountPath: /var/lib/postgresql/data
   volumeClaimTemplates:
     - metadata:
-        name: data
+        name: postgres-storage
       spec:
         accessModes: ["ReadWriteOnce"]
         storageClassName: standard-rwo
