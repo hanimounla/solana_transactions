@@ -7,11 +7,11 @@ metadata:
     app.kubernetes.io/name: solana-transactions-db
     app.kubernetes.io/part-of: aiservice-solana-transactions
 spec:
+  type: ClusterIP
   ports:
     - port: 5432
       name: postgresql
       targetPort: 5432
-  clusterIP: None
   selector:
     app.kubernetes.io/name: solana-transactions-db
 ---
@@ -50,7 +50,7 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: solana-transactions-db-secret
+                  name: solana-transactions-secrets
                   key: POSTGRES_PASSWORD
                   optional: true
             - name: PGDATA

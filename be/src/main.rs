@@ -39,7 +39,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Connecting to PostgreSQL database at {}...",
         config.database_url
     );
-    let db = Db::connect(&config.database_url).await?;
+    let mut retries = 20;
+    let db = loop {
+        match Db::connect(&config.database_url).await {
+            Ok(db) => break db,
+            Err(e) => {
+                retries -= 1;
+                if retries == 0 {
+                    return Err(
+                        format!("Failed to connect to DB after multiple retries: {}", e).into(),
+                    );
+                }
+                tracing::warn!(
+                    "Waiting for database ({}), retrying in 3s ({} attempts left)...",
+                    e,
+                    retries
+                );
+                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+            }
+        }
+    };
     info!("Running database migrations...");
     db.run_migrations().await?;
     info!("Database is ready!");

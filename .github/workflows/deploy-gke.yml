@@ -127,6 +127,7 @@ jobs:
             kubectl create secret generic solana-transactions-secrets \
               --namespace=solana-transactions \
               --from-literal=DATABASE_URL="$DB_URL_SECRET" \
+              --from-literal=POSTGRES_PASSWORD="postgres_secure_pass" \
               --dry-run=client -o yaml | kubectl apply -f -
           else
             echo "DATABASE_URL secret not provided in GitHub Secrets, checking if secret exists in cluster..."
@@ -135,6 +136,7 @@ jobs:
               kubectl create secret generic solana-transactions-secrets \
                 --namespace=solana-transactions \
                 --from-literal=DATABASE_URL="postgres://postgres:postgres_secure_pass@solana-transactions-db:5432/solana_transactions_db" \
+                --from-literal=POSTGRES_PASSWORD="postgres_secure_pass" \
                 --dry-run=client -o yaml | kubectl apply -f -
             fi
           fi
@@ -165,6 +167,10 @@ jobs:
       # ===================================================================
       # 6. Verify Rollout Status
       # ===================================================================
+      - name: Verify PostgreSQL Rollout
+        run: |
+          kubectl rollout status statefulset/solana-transactions-db -n solana-transactions --timeout=300s
+
       - name: Verify Backend Rollout
         run: |
           kubectl rollout status deployment/solana-transactions-be -n solana-transactions --timeout=300s

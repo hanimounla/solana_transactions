@@ -109,12 +109,6 @@ pub struct Instruction {
 }
 
 #[derive(Deserialize, Debug, Clone, Serialize)]
-pub struct InnerInstructions {
-    pub index: u32,
-    pub instructions: Vec<Instruction>,
-}
-
-#[derive(Deserialize, Debug, Clone, Serialize)]
 pub struct AddressTableLookup {
     #[serde(rename = "accountKey")]
     pub account_key: String,

@@ -12,18 +12,6 @@ pub struct IndexedAccount {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DbTransaction {
-    pub signature: String,
-    pub slot: i64,
-    pub block_time: i64,
-    pub err: bool,
-    pub fee: i64,
-    pub fee_payer: String,
-    pub logs: Vec<String>,
-    pub raw_data: serde_json::Value,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DbSolBalanceChange {
     pub address: String,
     pub pre_balance: i64,
