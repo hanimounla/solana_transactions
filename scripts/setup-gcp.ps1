@@ -96,7 +96,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 $wifPrincipal = "principalSet://iam.googleapis.com/projects/$projectNumber/locations/global/workloadIdentityPools/$poolName/attribute.repository/$GitHubRepo"
-gcloud iam service-accounts add-iam-policy-binding $saEmail --role="roles/iam.workloadIdentityUser" --member="$wifPrincipal" --quiet
+
+Write-Host "Binding Workload Identity User and Token Creator roles..." -ForegroundColor Yellow
+gcloud iam service-accounts add-iam-policy-binding $saEmail --project=$ProjectId --role="roles/iam.workloadIdentityUser" --member="$wifPrincipal" --quiet
+gcloud iam service-accounts add-iam-policy-binding $saEmail --project=$ProjectId --role="roles/iam.serviceAccountTokenCreator" --member="$wifPrincipal" --quiet
+gcloud projects add-iam-policy-binding $ProjectId --member="serviceAccount:$saEmail" --role="roles/iam.serviceAccountTokenCreator" --quiet
 
 $wifProviderResource = "projects/$projectNumber/locations/global/workloadIdentityPools/$poolName/providers/$providerName"
 
