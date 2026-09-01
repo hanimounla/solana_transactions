@@ -13,8 +13,8 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 mod config;
 mod db;
 mod indexer;
-mod rpc;
 mod routes;
+mod rpc;
 
 use config::Config;
 use db::Db;
@@ -35,7 +35,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Config::from_env();
 
     // 3. Connect to Database and run migrations
-    info!("Connecting to PostgreSQL database at {}...", config.database_url);
+    info!(
+        "Connecting to PostgreSQL database at {}...",
+        config.database_url
+    );
     let db = Db::connect(&config.database_url).await?;
     info!("Running database migrations...");
     db.run_migrations().await?;
@@ -60,20 +63,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/api/health", get(routes::health_check))
         .route("/api/rpc/test", post(routes::test_rpc))
         .route("/api/account/:address", get(routes::get_account_overview))
-        .route("/api/account/:address/transactions", get(routes::get_transactions))
+        .route(
+            "/api/account/:address/transactions",
+            get(routes::get_transactions),
+        )
         .route(
             "/api/account/:address/index",
             post(routes::start_indexing).get(routes::get_indexing_progress),
         )
-        .route("/api/account/:address/balance-history", get(routes::get_balance_history))
-        .route("/api/account/:address/fees-history", get(routes::get_fees_history))
-        .route("/api/transaction/:signature", get(routes::get_transaction_detail))
+        .route(
+            "/api/account/:address/balance-history",
+            get(routes::get_balance_history),
+        )
+        .route(
+            "/api/account/:address/fees-history",
+            get(routes::get_fees_history),
+        )
+        .route(
+            "/api/transaction/:signature",
+            get(routes::get_transaction_detail),
+        )
         .layer(cors)
         .with_state(state);
 
     // 7. Start server
     let addr = SocketAddr::from(([0, 0, 0, 0], config.server_port));
-    info!("Backend server listening on http://localhost:{}", config.server_port);
+    info!(
+        "Backend server listening on http://localhost:{}",
+        config.server_port
+    );
 
     let listener = tokio::net::TcpListener::bind(&addr).await?;
     axum::serve(listener, app)

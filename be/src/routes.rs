@@ -28,12 +28,22 @@ pub struct HealthResponse {
 
 pub async fn health_check(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     match sqlx::query("SELECT 1").execute(&state.db.pool).await {
-        Ok(_) => (StatusCode::OK, Json(HealthResponse { status: "ok", db: "connected" })).into_response(),
+        Ok(_) => (
+            StatusCode::OK,
+            Json(HealthResponse {
+                status: "ok",
+                db: "connected",
+            }),
+        )
+            .into_response(),
         Err(e) => {
             error!("Health check database ping failed: {}", e);
             (
                 StatusCode::SERVICE_UNAVAILABLE,
-                Json(HealthResponse { status: "unhealthy", db: "disconnected" }),
+                Json(HealthResponse {
+                    status: "unhealthy",
+                    db: "disconnected",
+                }),
             )
                 .into_response()
         }
@@ -109,7 +119,10 @@ fn get_rpc_client(headers: &HeaderMap, default_rpc: &str) -> SolanaRpcClient {
 // Handler to test RPC URL connectivity
 pub async fn test_rpc(Json(payload): Json<RpcTestRequest>) -> impl IntoResponse {
     let client = SolanaRpcClient::new(payload.rpc_url);
-    match client.get_balance("FBQ23w6WVetKYJMLCrtxqPn9pKg9rZbB8GcW4MT63YzA").await {
+    match client
+        .get_balance("FBQ23w6WVetKYJMLCrtxqPn9pKg9rZbB8GcW4MT63YzA")
+        .await
+    {
         Ok(_) => (
             StatusCode::OK,
             Json(RpcTestResponse {
@@ -147,7 +160,10 @@ pub async fn get_account_overview(
                     serde_json::Value::String(s) => s.len(), // Base64 or plain string length
                     serde_json::Value::Array(arr) => {
                         // Sometimes base64 is in format [data, encoding]
-                        arr.first().and_then(|v| v.as_str()).map(|s| s.len()).unwrap_or(0)
+                        arr.first()
+                            .and_then(|v| v.as_str())
+                            .map(|s| s.len())
+                            .unwrap_or(0)
                     }
                     _ => 0,
                 };
@@ -174,7 +190,11 @@ pub async fn get_account_overview(
         }
         Err(e) => {
             error!("Failed to fetch account info: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, format!("RPC error: {}", e)).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("RPC error: {}", e),
+            )
+                .into_response()
         }
     }
 }
@@ -231,10 +251,13 @@ pub async fn get_transactions(
     let end = params.end_date.unwrap_or(chrono::Utc::now().timestamp());
 
     let rpc_limit = std::cmp::min(1000, limit + offset) as usize;
-    match rpc.get_signatures_for_address(&address, None, None, Some(rpc_limit)).await {
+    match rpc
+        .get_signatures_for_address(&address, None, None, Some(rpc_limit))
+        .await
+    {
         Ok(signatures) => {
             let mut filtered_txs = Vec::new();
-            
+
             // We slice the signatures to offset-limit
             let start_idx = std::cmp::min(offset as usize, signatures.len());
             let end_idx = std::cmp::min((offset + limit) as usize, signatures.len());
@@ -242,7 +265,10 @@ pub async fn get_transactions(
 
             for sig_info in target_signatures {
                 let time = sig_info.block_time.unwrap_or(0);
-                if time == 0 || (params.start_date.is_some() && time < start) || (params.end_date.is_some() && time > end) {
+                if time == 0
+                    || (params.start_date.is_some() && time < start)
+                    || (params.end_date.is_some() && time > end)
+                {
                     continue;
                 }
 
@@ -251,23 +277,27 @@ pub async fn get_transactions(
                     let signature = sig_info.signature.clone();
                     let slot = tx_details.slot as i64;
                     let block_time = tx_details.block_time.unwrap_or(0);
-                    
-                    let meta = tx_details.meta.clone().unwrap_or(crate::rpc::RpcTransactionMeta {
-                        err: None,
-                        fee: 0,
-                        pre_balances: Vec::new(),
-                        post_balances: Vec::new(),
-                        pre_token_balances: None,
-                        post_token_balances: None,
-                        log_messages: None,
-                        compute_units_consumed: None,
-                        loaded_addresses: None,
-                    });
+
+                    let meta = tx_details
+                        .meta
+                        .clone()
+                        .unwrap_or(crate::rpc::RpcTransactionMeta {
+                            err: None,
+                            fee: 0,
+                            pre_balances: Vec::new(),
+                            post_balances: Vec::new(),
+                            pre_token_balances: None,
+                            post_token_balances: None,
+                            log_messages: None,
+                            compute_units_consumed: None,
+                            loaded_addresses: None,
+                        });
 
                     let err = meta.err.is_some();
                     let fee = meta.fee as i64;
                     let logs = meta.log_messages.unwrap_or_default();
-                    let raw_data = serde_json::to_value(&tx_details).unwrap_or(serde_json::Value::Null);
+                    let raw_data =
+                        serde_json::to_value(&tx_details).unwrap_or(serde_json::Value::Null);
 
                     let mut account_keys = tx_details.transaction.message.account_keys.clone();
                     if let Some(loaded) = &meta.loaded_addresses {
@@ -320,7 +350,11 @@ pub async fn get_transactions(
         }
         Err(e) => {
             error!("RPC signature lookup failed: {}", e);
-            (StatusCode::INTERNAL_SERVER_ERROR, format!("RPC error: {}", e)).into_response()
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("RPC error: {}", e),
+            )
+                .into_response()
         }
     }
 }
@@ -401,7 +435,10 @@ pub async fn get_indexing_progress(
                 total_found: 0,
                 processed: 0,
                 errors: 0,
-                status: format!("Account was previously indexed. Last run: {}", status.last_indexed_at),
+                status: format!(
+                    "Account was previously indexed. Last run: {}",
+                    status.last_indexed_at
+                ),
                 active: false,
             })
             .into_response(),
@@ -512,16 +549,17 @@ pub async fn get_fees_history(
         }
     };
 
-    let mut points: Vec<FeesPoint> = buckets.into_iter().map(|b| {
-        FeesPoint {
+    let mut points: Vec<FeesPoint> = buckets
+        .into_iter()
+        .map(|b| FeesPoint {
             timestamp: b.bucket_time,
             total_fees_sol: b.total_fees as f64 / 1_000_000_000.0,
             success_fees_sol: b.success_fees as f64 / 1_000_000_000.0,
             failed_fees_sol: b.failed_fees as f64 / 1_000_000_000.0,
             success_count: b.success_count,
             failed_count: b.failed_count,
-        }
-    }).collect();
+        })
+        .collect();
 
     // Reverse to go chronologically
     points.reverse();
@@ -544,7 +582,11 @@ pub async fn get_transaction_detail(
     Path(signature): Path<String>,
 ) -> impl IntoResponse {
     // 1. Try DB first
-    match state.db.get_transactions_for_account(&signature, None, None, 1, 0).await {
+    match state
+        .db
+        .get_transactions_for_account(&signature, None, None, 1, 0)
+        .await
+    {
         Ok(mut txs) => {
             if let Some(tx) = txs.pop() {
                 return (StatusCode::OK, Json(tx)).into_response();
@@ -561,18 +603,21 @@ pub async fn get_transaction_detail(
         Ok(Some(tx_details)) => {
             let slot = tx_details.slot as i64;
             let block_time = tx_details.block_time.unwrap_or(0);
-            
-            let meta = tx_details.meta.clone().unwrap_or(crate::rpc::RpcTransactionMeta {
-                err: None,
-                fee: 0,
-                pre_balances: Vec::new(),
-                post_balances: Vec::new(),
-                pre_token_balances: None,
-                post_token_balances: None,
-                log_messages: None,
-                compute_units_consumed: None,
-                loaded_addresses: None,
-            });
+
+            let meta = tx_details
+                .meta
+                .clone()
+                .unwrap_or(crate::rpc::RpcTransactionMeta {
+                    err: None,
+                    fee: 0,
+                    pre_balances: Vec::new(),
+                    post_balances: Vec::new(),
+                    pre_token_balances: None,
+                    post_token_balances: None,
+                    log_messages: None,
+                    compute_units_consumed: None,
+                    loaded_addresses: None,
+                });
 
             let err = meta.err.is_some();
             let fee = meta.fee as i64;
@@ -622,6 +667,10 @@ pub async fn get_transaction_detail(
             .into_response()
         }
         Ok(None) => (StatusCode::NOT_FOUND, "Transaction not found").into_response(),
-        Err(e) => (StatusCode::INTERNAL_SERVER_ERROR, format!("RPC error: {}", e)).into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("RPC error: {}", e),
+        )
+            .into_response(),
     }
 }

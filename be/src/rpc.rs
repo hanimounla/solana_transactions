@@ -190,12 +190,17 @@ impl SolanaRpcClient {
             return Err(format!("RPC error {}: {}", err.code, err.message));
         }
 
-        body.result.ok_or_else(|| "Empty RPC response result".to_string())
+        body.result
+            .ok_or_else(|| "Empty RPC response result".to_string())
     }
 
     pub async fn get_balance(&self, address: &str) -> Result<u64, String> {
-        let res: Value = self.send_request("getBalance", vec![Value::String(address.to_string())]).await?;
-        let value = res["value"].as_u64().ok_or_else(|| "Failed to parse balance value".to_string())?;
+        let res: Value = self
+            .send_request("getBalance", vec![Value::String(address.to_string())])
+            .await?;
+        let value = res["value"]
+            .as_u64()
+            .ok_or_else(|| "Failed to parse balance value".to_string())?;
         Ok(value)
     }
 
@@ -229,17 +234,22 @@ impl SolanaRpcClient {
         }
 
         let params = (address.to_string(), config);
-        let signatures: Vec<RpcSignatureInfo> = self.send_request("getSignaturesForAddress", params).await?;
+        let signatures: Vec<RpcSignatureInfo> =
+            self.send_request("getSignaturesForAddress", params).await?;
         Ok(signatures)
     }
 
-    pub async fn get_transaction(&self, signature: &str) -> Result<Option<RpcTransactionDetail>, String> {
+    pub async fn get_transaction(
+        &self,
+        signature: &str,
+    ) -> Result<Option<RpcTransactionDetail>, String> {
         let config = serde_json::json!({
             "encoding": "json",
             "maxSupportedTransactionVersion": 0
         });
         let params = (signature.to_string(), config);
-        let transaction: Option<RpcTransactionDetail> = self.send_request("getTransaction", params).await?;
+        let transaction: Option<RpcTransactionDetail> =
+            self.send_request("getTransaction", params).await?;
         Ok(transaction)
     }
 }

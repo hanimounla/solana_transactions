@@ -10,8 +10,9 @@ impl Config {
     pub fn from_env() -> Self {
         dotenvy::dotenv().ok();
 
-        let database_url = env::var("DATABASE_URL")
-            .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/solana_transactions_db".to_string());
+        let database_url = env::var("DATABASE_URL").unwrap_or_else(|_| {
+            "postgres://postgres:postgres@localhost:5432/solana_transactions_db".to_string()
+        });
 
         let default_rpc_url = env::var("SOLANA_RPC_URL")
             .or_else(|_| env::var("RPC_ENDPOINT"))

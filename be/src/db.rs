@@ -1,7 +1,7 @@
-use sqlx::{postgres::PgPoolOptions, PgPool, Row};
-use serde::{Serialize, Deserialize};
-use std::collections::HashMap;
 use crate::rpc::RpcTransactionDetail;
+use serde::{Deserialize, Serialize};
+use sqlx::{postgres::PgPoolOptions, PgPool, Row};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IndexedAccount {
@@ -105,7 +105,10 @@ impl Db {
             account_keys.extend(loaded.readonly.clone());
         }
 
-        let fee_payer = account_keys.first().cloned().unwrap_or_else(|| "".to_string());
+        let fee_payer = account_keys
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "".to_string());
 
         let raw_data = serde_json::to_value(tx).unwrap_or(serde_json::Value::Null);
 
@@ -130,20 +133,27 @@ impl Db {
         .bind(&logs)
         .bind(&raw_data);
 
-        let mut transaction = self.pool.begin().await
+        let mut transaction = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| format!("Failed to begin DB transaction: {}", e))?;
 
-        db_tx.execute(&mut *transaction).await
+        db_tx
+            .execute(&mut *transaction)
+            .await
             .map_err(|e| format!("Failed to insert transaction: {}", e))?;
 
         sqlx::query("DELETE FROM sol_balance_changes WHERE signature = $1")
             .bind(&signature)
-            .execute(&mut *transaction).await
+            .execute(&mut *transaction)
+            .await
             .map_err(|e| format!("Failed to delete old SOL changes: {}", e))?;
 
         sqlx::query("DELETE FROM token_balance_changes WHERE signature = $1")
             .bind(&signature)
-            .execute(&mut *transaction).await
+            .execute(&mut *transaction)
+            .await
             .map_err(|e| format!("Failed to delete old token changes: {}", e))?;
 
         for (i, address) in account_keys.iter().enumerate() {
@@ -173,8 +183,12 @@ impl Db {
         if let Some(pre_token) = &meta.pre_token_balances {
             for tb in pre_token {
                 if let Some(owner) = &tb.owner {
-                    let amount: f64 = tb.ui_token_amount.amount.parse().unwrap_or(0.0) / 10f64.powi(tb.ui_token_amount.decimals as i32);
-                    pre_token_map.insert((tb.account_index, &tb.mint, owner), (amount, tb.ui_token_amount.decimals));
+                    let amount: f64 = tb.ui_token_amount.amount.parse().unwrap_or(0.0)
+                        / 10f64.powi(tb.ui_token_amount.decimals as i32);
+                    pre_token_map.insert(
+                        (tb.account_index, &tb.mint, owner),
+                        (amount, tb.ui_token_amount.decimals),
+                    );
                 }
             }
         }
@@ -183,8 +197,12 @@ impl Db {
         if let Some(post_token) = &meta.post_token_balances {
             for tb in post_token {
                 if let Some(owner) = &tb.owner {
-                    let amount: f64 = tb.ui_token_amount.amount.parse().unwrap_or(0.0) / 10f64.powi(tb.ui_token_amount.decimals as i32);
-                    post_token_map.insert((tb.account_index, &tb.mint, owner), (amount, tb.ui_token_amount.decimals));
+                    let amount: f64 = tb.ui_token_amount.amount.parse().unwrap_or(0.0)
+                        / 10f64.powi(tb.ui_token_amount.decimals as i32);
+                    post_token_map.insert(
+                        (tb.account_index, &tb.mint, owner),
+                        (amount, tb.ui_token_amount.decimals),
+                    );
                 }
             }
         }
@@ -198,12 +216,21 @@ impl Db {
         }
 
         for (account_index, mint, owner) in all_token_keys {
-            let (pre_val, pre_dec) = pre_token_map.get(&(account_index, mint, owner)).cloned().unwrap_or((0.0, 0));
-            let (post_val, post_dec) = post_token_map.get(&(account_index, mint, owner)).cloned().unwrap_or((0.0, 0));
+            let (pre_val, pre_dec) = pre_token_map
+                .get(&(account_index, mint, owner))
+                .cloned()
+                .unwrap_or((0.0, 0));
+            let (post_val, post_dec) = post_token_map
+                .get(&(account_index, mint, owner))
+                .cloned()
+                .unwrap_or((0.0, 0));
             let change_val = post_val - pre_val;
             let decimals = if post_dec > 0 { post_dec } else { pre_dec };
 
-            let token_account_address = account_keys.get(account_index as usize).cloned().unwrap_or_else(|| "".to_string());
+            let token_account_address = account_keys
+                .get(account_index as usize)
+                .cloned()
+                .unwrap_or_else(|| "".to_string());
 
             sqlx::query(
                 "INSERT INTO token_balance_changes (signature, address, mint, owner, pre_amount, post_amount, change_amount, decimals)
@@ -221,13 +248,20 @@ impl Db {
             .map_err(|e| format!("Failed to insert Token balance change: {}", e))?;
         }
 
-        transaction.commit().await
+        transaction
+            .commit()
+            .await
             .map_err(|e| format!("Failed to commit DB transaction: {}", e))?;
 
         Ok(())
     }
 
-    pub async fn update_index_status(&self, address: &str, min_time: Option<i64>, max_time: Option<i64>) -> Result<(), String> {
+    pub async fn update_index_status(
+        &self,
+        address: &str,
+        min_time: Option<i64>,
+        max_time: Option<i64>,
+    ) -> Result<(), String> {
         sqlx::query(
             "INSERT INTO indexed_accounts (address, last_indexed_at, min_block_time, max_block_time)
              VALUES ($1, NOW(), $2, $3)
@@ -245,7 +279,10 @@ impl Db {
         Ok(())
     }
 
-    pub async fn get_indexed_status(&self, address: &str) -> Result<Option<IndexedAccount>, String> {
+    pub async fn get_indexed_status(
+        &self,
+        address: &str,
+    ) -> Result<Option<IndexedAccount>, String> {
         let row = sqlx::query("SELECT address, last_indexed_at, min_block_time, max_block_time FROM indexed_accounts WHERE address = $1")
             .bind(address)
             .fetch_optional(&self.pool)
@@ -290,7 +327,11 @@ impl Db {
             bind_idx += 1;
         }
 
-        query_str.push_str(&format!(" ORDER BY t.block_time DESC LIMIT ${} OFFSET ${}", bind_idx, bind_idx + 1));
+        query_str.push_str(&format!(
+            " ORDER BY t.block_time DESC LIMIT ${} OFFSET ${}",
+            bind_idx,
+            bind_idx + 1
+        ));
 
         let mut query = sqlx::query(&query_str).bind(address);
 
@@ -303,41 +344,49 @@ impl Db {
 
         query = query.bind(limit).bind(offset);
 
-        let rows = query.fetch_all(&self.pool).await
+        let rows = query
+            .fetch_all(&self.pool)
+            .await
             .map_err(|e| format!("Failed to fetch transactions: {}", e))?;
 
         let mut txs = Vec::new();
         for r in rows {
             let signature: String = r.get("signature");
-            
+
             let sol_rows = sqlx::query("SELECT address, pre_balance, post_balance, change_amount, is_signer, is_writable FROM sol_balance_changes WHERE signature = $1")
                 .bind(&signature)
                 .fetch_all(&self.pool).await
                 .map_err(|e| format!("Failed to fetch SOL changes: {}", e))?;
-            
-            let sol_changes = sol_rows.iter().map(|sr| DbSolBalanceChange {
-                address: sr.get("address"),
-                pre_balance: sr.get("pre_balance"),
-                post_balance: sr.get("post_balance"),
-                change_amount: sr.get("change_amount"),
-                is_signer: sr.get("is_signer"),
-                is_writable: sr.get("is_writable"),
-            }).collect();
+
+            let sol_changes = sol_rows
+                .iter()
+                .map(|sr| DbSolBalanceChange {
+                    address: sr.get("address"),
+                    pre_balance: sr.get("pre_balance"),
+                    post_balance: sr.get("post_balance"),
+                    change_amount: sr.get("change_amount"),
+                    is_signer: sr.get("is_signer"),
+                    is_writable: sr.get("is_writable"),
+                })
+                .collect();
 
             let token_rows = sqlx::query("SELECT address, mint, owner, pre_amount, post_amount, change_amount, decimals FROM token_balance_changes WHERE signature = $1")
                 .bind(&signature)
                 .fetch_all(&self.pool).await
                 .map_err(|e| format!("Failed to fetch Token changes: {}", e))?;
-            
-            let token_changes = token_rows.iter().map(|tr| DbTokenBalanceChange {
-                address: tr.get("address"),
-                mint: tr.get("mint"),
-                owner: tr.get("owner"),
-                pre_amount: tr.get("pre_amount"),
-                post_amount: tr.get("post_amount"),
-                change_amount: tr.get("change_amount"),
-                decimals: tr.get("decimals"),
-            }).collect();
+
+            let token_changes = token_rows
+                .iter()
+                .map(|tr| DbTokenBalanceChange {
+                    address: tr.get("address"),
+                    mint: tr.get("mint"),
+                    owner: tr.get("owner"),
+                    pre_amount: tr.get("pre_amount"),
+                    post_amount: tr.get("post_amount"),
+                    change_amount: tr.get("change_amount"),
+                    decimals: tr.get("decimals"),
+                })
+                .collect();
 
             txs.push(FullTransactionDetail {
                 signature,
@@ -356,7 +405,10 @@ impl Db {
         Ok(txs)
     }
 
-    pub async fn get_sol_balance_changes_for_address(&self, address: &str) -> Result<Vec<(i64, i64)>, String> {
+    pub async fn get_sol_balance_changes_for_address(
+        &self,
+        address: &str,
+    ) -> Result<Vec<(i64, i64)>, String> {
         let rows = sqlx::query(
             "SELECT DISTINCT ON ((t.block_time / 300) * 300)
                     (t.block_time / 300) * 300 AS bucket_time,
@@ -364,21 +416,30 @@ impl Db {
              FROM sol_balance_changes s
              JOIN transactions t ON s.signature = t.signature
              WHERE s.address = $1
-             ORDER BY bucket_time DESC, t.block_time DESC, s.id DESC"
+             ORDER BY bucket_time DESC, t.block_time DESC, s.id DESC",
         )
         .bind(address)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| format!("Failed to fetch SOL balance changes: {}", e))?;
 
-        let changes = rows.iter().map(|r| {
-            (r.get::<i64, _>("bucket_time"), r.get::<i64, _>("post_balance"))
-        }).collect();
+        let changes = rows
+            .iter()
+            .map(|r| {
+                (
+                    r.get::<i64, _>("bucket_time"),
+                    r.get::<i64, _>("post_balance"),
+                )
+            })
+            .collect();
 
         Ok(changes)
     }
 
-    pub async fn get_fees_history_for_address(&self, address: &str) -> Result<Vec<DbFeesBucket>, String> {
+    pub async fn get_fees_history_for_address(
+        &self,
+        address: &str,
+    ) -> Result<Vec<DbFeesBucket>, String> {
         let rows = sqlx::query(
             "SELECT (block_time / 300) * 300 AS bucket_time,
                     SUM(fee)::BIGINT AS total_fees,
@@ -389,23 +450,24 @@ impl Db {
              FROM transactions
              WHERE fee_payer = $1
              GROUP BY bucket_time
-             ORDER BY bucket_time DESC"
+             ORDER BY bucket_time DESC",
         )
         .bind(address)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| format!("Failed to fetch fees history: {}", e))?;
 
-        let buckets = rows.iter().map(|r| {
-            DbFeesBucket {
+        let buckets = rows
+            .iter()
+            .map(|r| DbFeesBucket {
                 bucket_time: r.get::<i64, _>("bucket_time"),
                 total_fees: r.get::<i64, _>("total_fees"),
                 success_fees: r.get::<i64, _>("success_fees"),
                 failed_fees: r.get::<i64, _>("failed_fees"),
                 success_count: r.get::<i64, _>("success_count"),
                 failed_count: r.get::<i64, _>("failed_count"),
-            }
-        }).collect();
+            })
+            .collect();
 
         Ok(buckets)
     }

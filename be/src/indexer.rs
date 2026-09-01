@@ -3,7 +3,7 @@ use crate::rpc::SolanaRpcClient;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tokio::sync::Mutex;
-use tracing::{info, error};
+use tracing::{error, info};
 
 pub struct IndexJobProgress {
     pub total_found: usize,
@@ -23,7 +23,10 @@ impl Indexer {
         end_time: i64,
         progress: Arc<Mutex<IndexJobProgress>>,
     ) {
-        info!("Starting indexer job for address {} in range [{}, {}]", address, start_time, end_time);
+        info!(
+            "Starting indexer job for address {} in range [{}, {}]",
+            address, start_time, end_time
+        );
 
         {
             let mut prog = progress.lock().await;
@@ -40,7 +43,10 @@ impl Indexer {
         let mut max_block_time_seen: Option<i64> = None;
 
         while !stop_crawling {
-            let batch = match rpc.get_signatures_for_address(&address, before_signature.clone(), None, Some(limit)).await {
+            let batch = match rpc
+                .get_signatures_for_address(&address, before_signature.clone(), None, Some(limit))
+                .await
+            {
                 Ok(b) => b,
                 Err(e) => {
                     error!("Error fetching signatures for address {}: {}", address, e);
@@ -67,8 +73,10 @@ impl Indexer {
                 }
 
                 // Keep track of total times seen
-                min_block_time_seen = Some(min_block_time_seen.map_or(time, |m| std::cmp::min(m, time)));
-                max_block_time_seen = Some(max_block_time_seen.map_or(time, |m| std::cmp::max(m, time)));
+                min_block_time_seen =
+                    Some(min_block_time_seen.map_or(time, |m| std::cmp::min(m, time)));
+                max_block_time_seen =
+                    Some(max_block_time_seen.map_or(time, |m| std::cmp::max(m, time)));
 
                 // Smart date range conversion logic:
                 if time > end_time {
@@ -95,7 +103,10 @@ impl Indexer {
         }
 
         let total_sigs = signatures_to_fetch.len();
-        info!("Found {} signatures within target date range to index", total_sigs);
+        info!(
+            "Found {} signatures within target date range to index",
+            total_sigs
+        );
 
         {
             let mut prog = progress.lock().await;
@@ -107,7 +118,9 @@ impl Indexer {
             let mut prog = progress.lock().await;
             prog.status = "Completed: No transactions in range".to_string();
             // Still update status
-            let _ = db.update_index_status(&address, min_block_time_seen, max_block_time_seen).await;
+            let _ = db
+                .update_index_status(&address, min_block_time_seen, max_block_time_seen)
+                .await;
             return;
         }
 
@@ -122,7 +135,10 @@ impl Indexer {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(100);
-        info!("Indexing with pacing cooldown of {}ms between requests", cooldown_ms);
+        info!(
+            "Indexing with pacing cooldown of {}ms between requests",
+            cooldown_ms
+        );
 
         let mut handlers = Vec::new();
 
@@ -160,7 +176,10 @@ impl Indexer {
                 let mut p = prog_mutex.lock().await;
                 p.processed = processed;
                 p.errors = errors;
-                p.status = format!("Processed {}/{} (Errors: {})", processed, p.total_found, errors);
+                p.status = format!(
+                    "Processed {}/{} (Errors: {})",
+                    processed, p.total_found, errors
+                );
             });
 
             handlers.push(handle);
@@ -180,7 +199,9 @@ impl Indexer {
         let final_processed = processed_count.load(Ordering::SeqCst);
         let final_errors = error_count.load(Ordering::SeqCst);
 
-        let _ = db_arc.update_index_status(&address, min_block_time_seen, max_block_time_seen).await;
+        let _ = db_arc
+            .update_index_status(&address, min_block_time_seen, max_block_time_seen)
+            .await;
 
         let mut prog = progress.lock().await;
         prog.status = format!(
